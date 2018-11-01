@@ -1,0 +1,209 @@
+---
+title: "EDA Investment Online"
+author: "Meagan Gentry"
+date: "April 30, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Basic libraries
+library(tidyverse)
+library(readxl)
+library(fpp2)
+library(changepoint)
+library(readxl)
+```
+
+## Exploratory data analysis of APEM Investment data:
+
+Lingering issues include
+
+* Currency for each country are unidentified, as well as scale
+* SEM program and Public route (only) have investment numbers available
+* Hong Kong, Singapore, and Korea (only) have investmnet numbers available
+* Unsure if week start is referring to fiscal year or calendar year
+
+```{r}
+# EDA for media spend APEM Investment data
+apem <- read_excel("data/APEM Investment data.xlsx")
+apem$`Week Start` = as.Date(apem$`Week Start`)
+
+# Get a view of the data
+#summary(apem)
+#glimpse(apem)
+```
+
+```{r}
+# By Country, Route, program, and 'Week Start',
+# get totals for net and gross investment
+  
+apem_net_ <- apem %>% spread(Country, Net_actual_investment, fill=0, sep='_') %>% select(-Gross_actual_investment) 
+
+apem_gross_ <- apem %>% spread(Country, Gross_actual_investment, fill=0, sep='_' )%>% select(-Net_actual_investment)
+
+apem_country <- apem %>% group_by(Country, `Week Start`) %>% 
+  summarise(Net_actual_investment = sum(Net_actual_investment),
+            Gross_actual_investment = sum(Gross_actual_investment))
+```
+
+```{r}
+min <- as.Date("2016-07-04")
+max <- as.Date("2018-04-16")
+```
+
+## APEM Investment by Country
+```{r, echo=FALSE}
+p <- ggplot(apem_country, aes(x = `Week Start`, y = Net_actual_investment)) + 
+  geom_line(aes(color = Country), size = 1) +
+ # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p 
+```
+
+### Honk Kong SEM Public 
+```{r, echo=FALSE}
+apem_hk <- apem_country %>% filter(Country=='Hong Kong')
+
+p <- ggplot(apem_hk, aes(x = `Week Start`, y = Net_actual_investment)) + 
+  geom_line(aes(color = Country), size = 1) +
+  # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p
+
+p + stat_smooth(
+  color = "#FC4E07", fill = "#FC4E07",
+  method = "loess"
+)
+```
+
+### Singapore SEM Public
+```{r, echo=FALSE}
+apem_sg <- apem_country %>% filter(Country=='Singapore')
+
+p <- ggplot(apem_sg, aes(x = `Week Start`, y = Net_actual_investment)) + 
+  geom_line(aes(color = Country), size = 1) +
+  # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p
+
+p + stat_smooth(
+  color = "#FC4E07", fill = "#FC4E07",
+  method = "loess"
+)
+```
+
+### Korea SEM Public
+```{r, echo=FALSE}
+apem_kr <- apem_country %>% filter(Country=='Korea')
+
+p <- ggplot(apem_kr, aes(x = `Week Start`, y = Net_actual_investment)) + 
+  geom_line(aes(color = Country), size = 1) +
+  # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p
+
+p + stat_smooth(
+  color = "#FC4E07", fill = "#FC4E07",
+  method = "loess"
+)
+```
+
+
+## Exploratory data analysis of JP Investment data:
+```{r}
+# EDA for media spend JP Investment data
+
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+  if(!tibble) x <- lapply(x, as.data.frame)
+  names(x) <- sheets
+  x
+}
+
+jp_sheets <- read_excel_allsheets("data/jp_dg_spend.xlsx")
+
+jp_sheets <- lapply(jp_sheets, function(X) X[,c(4,6)])
+
+jp <- do.call('rbind', jp_sheets)
+
+jp$program <- rep(names(jp_sheets), each = 111)
+jp$`Week Start Date` <- as.Date(jp$`Week Start Date`)
+```
+
+```{r}
+min <- as.Date("2016-04-01")
+max <- as.Date("2018-03-26")
+```
+
+## Japan Investment Data (All channels)
+
+Lingering issues include
+
+* Currency is unknown, as well as scale
+* Unsure how the programs (Lenovo vs NEC) should map to attribution data
+
+## Japan Investment by program (most are obscured)
+```{r, echo=FALSE}
+p <- ggplot(jp, aes(x = `Week Start Date`, y = Spend)) + 
+  geom_line(aes(color = program), size = 1) +
+  # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p
+```
+
+### Each JP program and a smoothed trend:
+```{r, echo=FALSE}
+jp_plots = list()
+for (i in unique(jp$program)) {
+  jp_ <- jp %>% filter(program == i)
+  
+  p <- ggplot(jp_, aes(x = `Week Start Date`, y = Spend)) + 
+    geom_line(aes(color = program), size = 1) +
+    # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+    scale_x_date(limits = c(min, max)) +
+    theme_minimal() 
+  
+  print(
+    p +
+      stat_smooth(
+            color = "#FC4E07", fill = "#FC4E07",
+            method = "loess"
+      )
+  )
+}
+```
+
+## US Investment Data (SEM only)
+
+```{r}
+usca_sem <- read_excel('data/us_ca_sem_spend.xlsx')
+
+usca_sem$`Week Start` <- as.Date(usca_sem$`Week Start`)
+```
+
+
+```{r, echo=FALSE}
+p <- ggplot(usca_sem, aes(x = `Week Start`, y = `Total Cost`)) + 
+  geom_line(aes(color = program), size = 1) +
+  # scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_x_date(limits = c(min, max)) +
+  theme_minimal() 
+
+p +
+      stat_smooth(
+            color = "#FC4E07", fill = "#FC4E07",
+            method = "loess"
+      )
+```
+
